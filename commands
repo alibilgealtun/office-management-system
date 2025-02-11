@@ -1,0 +1,9 @@
+mkdir -p app/common app/image_processing app/rfid app/analytics app/models tests
+touch app/__init__.py app/config.py
+touch app/common/{__init__.py,db.py,logger.py,utilities.py}
+touch app/image_processing/{__init__.py,camera.py,yolo_inference.py,service.py}
+touch app/rfid/{__init__.py,rfid_reader.py,service.py}
+touch app/analytics/{__init__.py,deepseek_client.py,report_generator.py,email_notifier.py,scheduler.py}
+touch app/models/{__init__.py,image_record.py,rfid_record.py,user.py}
+touch tests/{__init__.py,test_image_processing.py,test_rfid.py,test_analytics.py}
+touch {main.py,requirements.txt,README.md,docker-compose.yml} 
