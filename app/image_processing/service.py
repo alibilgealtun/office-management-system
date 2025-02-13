@@ -1,3 +1,4 @@
+import time
 from collections import deque
 import datetime
 import cv2
@@ -14,54 +15,45 @@ class PersonDetectionService:
         self.camera = Camera()
         self.detector = YOLODetector()
         self.db = Database()
-        self.previous_count = 0
-        self.DEBOUNCE_FRAMES = 5
-        self.enter_counter = 0
-        self.leave_counter = 0
-        self.count_history = deque(maxlen=self.DEBOUNCE_FRAMES)
-        logger.info("PersonDetectionService initialized")
+        self.previous_count = 0  # Track previous person count
+        self.last_capture_time = 0  # Track last image capture time
+        self.CAPTURE_INTERVAL = 2  # Minimum seconds between captures
+
+    def capture_and_store_image(self):
+        current_time = time.time()
+        if current_time - self.last_capture_time < self.CAPTURE_INTERVAL:
+            logger.info("Skipping capture to avoid excessive image storage.")
+            return
+
+        frame = self.camera.capture_frame()
+        if frame is not None:
+            timestamp = datetime.datetime.now()
+            image_path = f"images/{timestamp.strftime('%Y%m%d_%H%M%S')}.jpg"
+            cv2.imwrite(image_path, frame)
+            self.db.insert(ImageRecord(timestamp=timestamp, image_path=image_path))
+            logger.info(f"Image saved at {image_path}")
+            self.last_capture_time = current_time  # Update last capture time
 
     def process_frame(self):
         try:
             frame = self.camera.read_frame()
+            if frame is None:
+                logger.warning("No frame captured from camera.")
+                return
+
             person_boxes = self.detector.detect_persons(frame)
             current_count = len(person_boxes)
 
-            self.count_history.append(current_count)
-            most_common_count = max(set(self.count_history), key=self.count_history.count)
+            if current_count != self.previous_count:
+                logger.info(f"Person count changed: {self.previous_count} -> {current_count}")
+                self._save_to_database(current_count, frame)
+                self.previous_count = current_count
 
-            self._handle_count_changes(most_common_count)
-            self._save_to_database(current_count, frame)
-            
-            frame = self.detector.draw_boxes(frame, person_boxes)
-            return frame
-        except Exception as e:
-            logger.error(f"Error processing frame: {str(e)}")
-            raise
+            frame_with_boxes = self.detector.draw_boxes(frame, person_boxes)
+            return frame_with_boxes
 
-    def _handle_count_changes(self, most_common_count):
-        try:
-            if most_common_count > self.previous_count:
-                self.enter_counter += 1
-                self.leave_counter = 0
-                if self.enter_counter == self.DEBOUNCE_FRAMES:
-                    num_entered = most_common_count - self.previous_count
-                    logger.info(f"{num_entered} Person(s) Entered at {datetime.datetime.now()}")
-                    self.previous_count = most_common_count
-                    self.enter_counter = 0
-            elif most_common_count < self.previous_count:
-                self.leave_counter += 1
-                self.enter_counter = 0
-                if self.leave_counter == self.DEBOUNCE_FRAMES:
-                    num_left = self.previous_count - most_common_count
-                    logger.info(f"{num_left} Person(s) Left at {datetime.datetime.now()}")
-                    self.previous_count = most_common_count
-                    self.leave_counter = 0
-            else:
-                self.enter_counter = 0
-                self.leave_counter = 0
         except Exception as e:
-            logger.error(f"Error handling count changes: {str(e)}")
+            logger.error(f"Error in process_frame: {str(e)}")
             raise
 
     def _save_to_database(self, count, frame):
@@ -76,4 +68,13 @@ class PersonDetectionService:
             logger.debug(f"Saved record to database: {count} persons at {timestamp}")
         except Exception as e:
             logger.error(f"Error saving to database: {str(e)}")
-            raise 
+            raise
+
+    def run(self):
+        while True:
+            try:
+                self.process_frame()
+                time.sleep(0.5)  # Small delay to prevent excessive CPU usage
+            except Exception as e:
+                logger.error(f"Error in detection loop: {e}")
+                time.sleep(2)  # Delay before retrying to prevent crash loops
