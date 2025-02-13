@@ -1,13 +1,20 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
+load_dotenv()
+
 # Database
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", 
+    "postgresql://postgres:postgres@localhost:5432/image_processing"
+)
+
 
 # YOLO settings
 YOLO_CONFIDENCE_THRESHOLD = 0.5
@@ -27,7 +34,7 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
 # Scheduler settings
 IMAGE_PROCESSING_INTERVAL = 30  # seconds
-REPORT_GENERATION_TIME = "21:00"
+REPORT_GENERATION_TIME = "0 21 * * *"  # This means 21:00 (9 PM) every day
 
 # Email settings
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
