@@ -8,6 +8,8 @@ logger = get_logger(__name__)
 class YOLODetector:
     def __init__(self):
         try:
+            # for CPU optimization
+            torch.set_num_threads(2)
             self.model = torch.hub.load('ultralytics/yolov5', 'yolov5n', pretrained=True)
             self.model.classes = [0]  # Only detect 'person' class
             logger.info("YOLOv5 model loaded successfully")
@@ -17,8 +19,10 @@ class YOLODetector:
 
     def detect_persons(self, frame):
         try:
-            results = self.model(frame)
-            detections = results.xyxy[0]  # Bounding boxes with scores and class IDs
+            # Resize for model 5n
+            resized_frame = cv2.resize(frame, (640, 640))
+            results = self.model(resized_frame)
+            detections = results.xyxy[0]  # Bounding box'lar, skor ve sınıf id'leri
 
             person_boxes = []
             for *box, score, cls in detections:
