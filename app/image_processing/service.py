@@ -1,5 +1,4 @@
 import time
-from collections import deque
 import datetime
 import cv2
 from app.common.logger import get_logger
@@ -11,45 +10,71 @@ from .yolo_inference import YOLODetector
 logger = get_logger(__name__)
 
 class PersonDetectionService:
-    def __init__(self):
-        self.camera = Camera()
-        self.detector = YOLODetector()
-        self.db = Database()
-        self.previous_count = 0  # Track previous person count
-        self.last_capture_time = 0  # Track last image capture time
-        self.CAPTURE_INTERVAL = 2  # Minimum seconds between captures
+    CAPTURE_INTERVAL = 30         # Seconds between each batch capture
+    CAPTURE_COUNT_AT_ONCE = 5     # Number of photos taken per batch
+    CAPTURE_DELAY = 0.2          # Delay between individual captures in a batch
 
-    def capture_and_store_image(self):
-        current_time = time.time()
-        if current_time - self.last_capture_time < self.CAPTURE_INTERVAL:
-            logger.info("Skipping capture to avoid excessive image storage.")
-            return
-
-        frame = self.camera.capture_frame()
-        if frame is not None:
-            timestamp = datetime.datetime.now()
-            image_path = f"images/{timestamp.strftime('%Y%m%d_%H%M%S')}.jpg"
-            cv2.imwrite(image_path, frame)
-            self.db.insert(ImageRecord(timestamp=timestamp, image_path=image_path))
-            logger.info(f"Image saved at {image_path}")
-            self.last_capture_time = current_time  # Update last capture time
+    def __init__(self, camera=None, detector=None, db=None):
+        self.camera = camera or Camera()
+        self.detector = detector or YOLODetector()
+        self.db = db or Database()
+        self.last_capture_time = 0
 
     def process_frame(self):
+        """
+        Processes frames for display and detection.
+        When capture interval is reached:
+        - Takes multiple photos in rapid succession
+        - Selects the one with maximum person count
+        - Saves only the best frame to database
+        Otherwise, just returns the current frame.
+        """
         try:
             frame = self.camera.read_frame()
             if frame is None:
-                logger.warning("No frame captured from camera.")
-                return
+                return None
 
-            person_boxes = self.detector.detect_persons(frame)
-            current_count = len(person_boxes)
+            current_time = time.time()
+            frame_with_boxes = frame.copy()  # Initialize with original frame
 
-            if current_count != self.previous_count:
-                logger.info(f"Person count changed: {self.previous_count} -> {current_count}")
-                self._save_to_database(current_count, frame)
-                self.previous_count = current_count
+            # Only perform detection and storage if the interval has passed
+            if current_time - self.last_capture_time >= self.CAPTURE_INTERVAL:
+                # Variables to track the best frame
+                best_count = -1
+                best_frame = None
+                best_frame_with_boxes = None
 
-            frame_with_boxes = self.detector.draw_boxes(frame, person_boxes)
+                logger.info(f"Starting batch capture of {self.CAPTURE_COUNT_AT_ONCE} frames")
+                
+                # Take CAPTURE_COUNT_AT_ONCE photos with delay
+                for i in range(self.CAPTURE_COUNT_AT_ONCE):
+                    try:
+                        frame = self.camera.read_frame()
+                        if frame is not None:
+                            # Detect persons
+                            person_boxes = self.detector.detect_persons(frame)
+                            count = len(person_boxes)
+                            
+                            # Update best frame if this one has more persons
+                            if count > best_count:
+                                best_count = count
+                                best_frame = frame.copy()
+                                best_frame_with_boxes = self.detector.draw_boxes(frame.copy(), person_boxes)
+                            
+                            logger.debug(f"Batch frame {i+1}: detected {count} persons")
+                        
+                        time.sleep(self.CAPTURE_DELAY)  # Wait before next capture
+                    except Exception as e:
+                        logger.error(f"Error capturing batch frame {i+1}: {e}")
+
+                # Save only the best frame from the batch
+                if best_frame is not None:
+                    self._save_to_database(best_count, best_frame)
+                    frame_with_boxes = best_frame_with_boxes
+                    logger.info(f"Saved single best frame with {best_count} persons from batch of {self.CAPTURE_COUNT_AT_ONCE}")
+                
+                self.last_capture_time = current_time
+
             return frame_with_boxes
 
         except Exception as e:
@@ -57,24 +82,17 @@ class PersonDetectionService:
             raise
 
     def _save_to_database(self, count, frame):
+        """Saves the frame and detection count to the database."""
         try:
             timestamp = datetime.datetime.now()
+            image_data = cv2.imencode('.jpg', frame)[1].tobytes()
             record = ImageRecord(
                 timestamp=timestamp,
                 person_count=count,
-                image_data=cv2.imencode('.jpg', frame)[1].tobytes()
+                image_data=image_data
             )
             self.db.save(record)
-            logger.debug(f"Saved record to database: {count} persons at {timestamp}")
+            logger.debug(f"Saved frame with {count} persons at {timestamp}")  # Changed to debug level
         except Exception as e:
             logger.error(f"Error saving to database: {str(e)}")
             raise
-
-    def run(self):
-        while True:
-            try:
-                self.process_frame()
-                time.sleep(0.5)  # Small delay to prevent excessive CPU usage
-            except Exception as e:
-                logger.error(f"Error in detection loop: {e}")
-                time.sleep(2)  # Delay before retrying to prevent crash loops
