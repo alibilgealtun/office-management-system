@@ -13,14 +13,7 @@ def setup_scheduler():
     try:
         scheduler = BackgroundScheduler()
         
-        # Image processing job - runs every 30 seconds
-        detection_service = PersonDetectionService()
-        scheduler.add_job(
-            detection_service.process_frame,
-            'interval',
-            seconds=IMAGE_PROCESSING_INTERVAL,
-            id='image_processing_job'
-        )
+        # Remove the image processing job since it's now handled in process_frame
         
         # Report generation and email job - runs daily at specified time
         report_generator = ReportGenerator()
