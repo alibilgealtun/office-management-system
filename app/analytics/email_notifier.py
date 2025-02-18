@@ -25,8 +25,7 @@ class EmailNotifier:
             msg = MIMEMultipart()
             msg['From'] = self.username
             msg['To'] = self.recipient
-            msg['Subject'] = f"Daily Usage Analysis Report - {datetime.date.today()}"
-
+            msg['Subject'] = f"Daily Usage Analysis Report - {datetime.today().date()}"
             msg.attach(MIMEText(report_content, 'html'))
 
             with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
