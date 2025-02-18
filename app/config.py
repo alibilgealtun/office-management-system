@@ -28,9 +28,8 @@ FRAME_HEIGHT = 480
 RFID_PORT = os.getenv("RFID_PORT", "/dev/ttyUSB0")  # Default USB port for RFID reader
 RFID_BAUDRATE = 9600
 
-# DeepSeek settings
-DEEPSEEK_API_URL = os.getenv("DEEPSEEK_API_URL")
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+# OPENAI settings
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Scheduler settings
 IMAGE_PROCESSING_INTERVAL = 30  # seconds
