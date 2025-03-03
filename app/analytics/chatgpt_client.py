@@ -16,18 +16,56 @@ class ChatGPTClient:
         try:
             prompt = self._format_data_for_analysis(data)
 
-            response = self.client.chat.completions.create(  # New API method
+            response = self.client.chat.completions.create( 
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "You are an expert data assistant. Prepare a report for how the office was used today, generate highlights and stuff. Do not include any unnecessary details. Make it like a professional 'daily office usage' report. GENERATE YOUR MESSAGE IN HTML FORMAT"},
+                    {"role": "system", "content": "You are an expert data assistant. Prepare a professional 'Daily Office Usage' report based on the provided data. The report should be structured in HTML format and include:"},
+                    {"role": "system", "content": 
+                        """
+                        <h1>Daily Office Usage Report</h1>
+
+                        <h2>Summary</h2>
+                        <p>Provide a brief overview of today's office usage, including the total number of employees who entered and exited, peak hours, and any notable changes from the previous day.</p>
+
+                        <h2>RFID Data</h2>
+                        <ul>
+                            <li>How many enterance is made to the office today?</li>
+                            <li>Peak Activity Time</li>
+                            <li>Low Activity Time</li>
+                        </ul>
+                        <h2>Image Processing Data</h2>
+                        <ul>
+                            <li>How many enterance is made to the office today?</li>
+                            <li>Peak Activity Time</li>
+                            <li>Low Activity Time</li>
+                        </ul>
+                        
+
+                        <h2>Key Highlights</h2>
+                        <ul>
+                            <li>List the most important events, including attendance peaks, unusual office usage patterns, or key personnel movements.</li>
+                            <li>Mention if any new employees or visitors were detected.</li>
+                            <li>Highlight anything you find meaningful for a manager.</li>
+                        </ul>
+                        
+
+                        <h2>Data Analysis & Trends</h2>
+                        <p>Analyze the data to identify trends. Discuss whether office occupancy has increased or decreased compared to previous days. Mention any significant patterns such as extended stays, irregular entry/exit patterns, or clustering of personnel.</p>
+
+                        <h2>Conclusion & Recommendations</h2>
+                        <p>Provide a professional conclusion, summarizing insights gained from the data. Offer recommendations such as optimizing office usage hours, security improvements, or policy changes based on observed patterns.</p>
+
+                        <p><i>This report is automatically generated using AI-based data analysis for Feriştah Dalkılıç.</i></p>
+                        """
+                    },
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
-                max_tokens=1000
+                max_tokens=1500
             )
 
             analysis = response.choices[0].message.content  # Updated response handling
-            return self._format_analysis_response(analysis)
+            return analysis
 
         except Exception as e:
             logger.error(f"Error analyzing data with ChatGPT: {str(e)}")
@@ -78,4 +116,23 @@ class ChatGPTClient:
             }
         except Exception as e:
             logger.error(f"Error formatting analysis response: {str(e)}")
+            raise
+
+    def generate_html_report(self, prompt):
+        """Generate HTML report using ChatGPT"""
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a security report generator. Generate detailed HTML reports with professional styling."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=2000
+            )
+            
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            logger.error(f"Error generating report with ChatGPT: {str(e)}")
             raise 
