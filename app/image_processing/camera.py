@@ -18,18 +18,17 @@ class Camera:
             # Release existing capture if any
             if self.cap is not None:
                 self.cap.release()
+
             
             if system == 'darwin':  # macOS
-                # Try to use AVFoundation backend for macOS
                 self.cap = cv2.VideoCapture(self.camera_id)
                 if not self.cap.isOpened():
-                    # Try with different backend
                     self.cap = cv2.VideoCapture(self.camera_id, cv2.CAP_AVFOUNDATION)
             elif system == 'windows':
                 self.cap = cv2.VideoCapture(self.camera_id, cv2.CAP_DSHOW)
-            else:  # Linux and others
-                self.cap = cv2.VideoCapture(self.camera_id)
-            
+            else:  # Linux (including Raspberry Pi)
+                self.cap = cv2.VideoCapture(self.camera_id, cv2.CAP_V4L2)
+                        
             if not self.cap.isOpened():
                 # Try different camera indices if the first one fails
                 for i in range(1, 5):
