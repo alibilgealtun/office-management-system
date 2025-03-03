@@ -1,33 +1,28 @@
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.pool import QueuePool
-from app.common.logger import get_logger
 from app.config import DATABASE_URL
+from app.common.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Create a single Base instance for all models
 Base = declarative_base()
 
 class Database:
     def __init__(self):
         try:
-            self.engine = create_engine(
-                DATABASE_URL,
-                poolclass=QueuePool,
-                pool_size=5,
-                max_overflow=10
-            )
+            self.engine = create_engine(DATABASE_URL)
             self.Session = sessionmaker(bind=self.engine)
             Base.metadata.create_all(self.engine)
-            logger.info("Database connection initialized")
         except Exception as e:
             logger.error(f"Error initializing database: {str(e)}")
             raise
 
     def save(self, record):
         """Saves a record to the database"""
+        session = self.Session()
         try:
-            session = self.Session()
             session.add(record)
             session.commit()
             logger.debug(f"Saved record: {record}")
