@@ -1,4 +1,5 @@
-import datetime
+from datetime import datetime
+import datetime as dt
 from sqlalchemy import func, and_
 from app.common.logger import get_logger
 from app.common.db import Database
@@ -15,23 +16,89 @@ class ReportGenerator:
         logger.info("Report generator initialized")
 
     def generate_daily_report(self):
-        """Generates daily usage report"""
+        """Generate daily report using ChatGPT"""
         try:
-            # Get today's data
-            today = datetime.date.today()
+            # Get today's date
+            today = datetime.now().date()
+            
+            # Get data from database
             image_data = self._get_image_data(today)
             rfid_data = self._get_rfid_data(today)
             
-            # Analyze data with DeepSeek
-            analysis = self._analyze_data(image_data, rfid_data)
+            data = {
+                'image_data':image_data,
+                'rfid_data':rfid_data
+            }
             
-            # Generate report
-            report = self._format_report(analysis)
-            logger.info("Daily report generated successfully")
-            return report
+            # Get HTML report from ChatGPT
+            html_report = self.chatgpt.analyze_usage_patterns(data)
+            
+            logger.info("Daily report generated successfully via ChatGPT")
+            return html_report
+
         except Exception as e:
             logger.error(f"Error generating daily report: {str(e)}")
-            raise
+            return self._generate_fallback_html_report(image_data, rfid_data)
+
+    def _format_hourly_stats(self, hourly_stats):
+        """Format hourly statistics for the prompt"""
+        formatted = []
+        for hour in range(24):
+            if hour in hourly_stats:
+                stats = hourly_stats[hour]
+                formatted.append(
+                    f"Hour {hour:02d}:00 - "
+                    f"Entries: {stats['entries']}, "
+                    f"Exits: {stats['exits']}"
+                )
+        return "\n".join(formatted)
+
+    def _format_detailed_records(self, records):
+        """Format detailed records for the prompt"""
+        formatted = []
+        for record in records:
+            timestamp = datetime.fromisoformat(record['timestamp'])
+            action = "entered" if record['is_entry'] else "exited"
+            formatted.append(
+                f"{timestamp.strftime('%H:%M:%S')} - "
+                f"Card {record['card_id']} {action}"
+            )
+        return "\n".join(formatted)
+
+    def _generate_fallback_html_report(self, image_data, rfid_data):
+        """Generate a basic HTML report if ChatGPT fails"""
+        return f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                h1 {{ color: #333; }}
+                .section {{ margin: 20px 0; }}
+                table {{ border-collapse: collapse; width: 100%; }}
+                th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                th {{ background-color: #f5f5f5; }}
+            </style>
+        </head>
+        <body>
+            <h1>Security Report - {datetime.now().date()}</h1>
+            
+            <div class="section">
+                <h2>Image Processing Statistics</h2>
+                <p>Total Detections: {image_data['total_detections']}</p>
+                <p>Total Persons: {image_data['total_persons']}</p>
+                <p>Average Persons per Detection: {image_data['average_persons']:.2f}</p>
+            </div>
+            
+            <div class="section">
+                <h2>RFID Access Statistics</h2>
+                <p>Total Events: {rfid_data['total_events']}</p>
+                <p>Unique Cards: {rfid_data['unique_cards']}</p>
+                <p>Total Entries: {rfid_data['total_entries']}</p>
+                <p>Total Exits: {rfid_data['total_exits']}</p>
+            </div>
+        </body>
+        </html>
+        """
 
     def _get_image_data(self, date):
         """Retrieves image processing data for the given date"""
@@ -40,8 +107,8 @@ class ReportGenerator:
             session = self.db.Session()
             
             # Get start and end of the specified date
-            start_date = datetime.datetime.combine(date, datetime.time.min)
-            end_date = datetime.datetime.combine(date, datetime.time.max)
+            start_date = datetime.combine(date, datetime.min.time())
+            end_date = datetime.combine(date, datetime.max.time())
             
             # Query image records for the specified date
             records = session.query(ImageRecord).filter(
@@ -102,8 +169,8 @@ class ReportGenerator:
             session = self.db.Session()
             
             # Get start and end of the specified date
-            start_date = datetime.datetime.combine(date, datetime.time.min)
-            end_date = datetime.datetime.combine(date, datetime.time.max)
+            start_date = datetime.combine(date, datetime.min.time())
+            end_date = datetime.combine(date, datetime.max.time())
             
             # Query RFID records for the specified date
             records = session.query(RFIDRecord).filter(
