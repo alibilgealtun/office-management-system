@@ -19,21 +19,24 @@ class EmailNotifier:
         self.recipient = REPORT_RECIPIENT
         logger.info("Email notifier initialized")
 
-    def send_report(self, report_content):
-        """Sends the daily report via email"""
+    def send_report(self, html_content):
+        """Send HTML report via email"""
         try:
-            msg = MIMEMultipart()
-            msg['From'] = self.username
-            msg['To'] = self.recipient
-            msg['Subject'] = f"Daily Usage Analysis Report - {datetime.today().date()}"
-            msg.attach(MIMEText(report_content, 'html'))
+            msg = MIMEMultipart('alternative')
+            msg['From'] = SMTP_USERNAME
+            msg['To'] = REPORT_RECIPIENT
+            msg['Subject'] = f"Daily Office Usage Report - {datetime.now().date()}"
 
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+            # Attach HTML content
+            msg.attach(MIMEText(html_content, 'html'))
+
+            # Send email
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
                 server.starttls()
-                server.login(self.username, self.password)
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
                 server.send_message(msg)
 
-            logger.info(f"Report sent successfully to {self.recipient}")
+            logger.info("HTML report email sent successfully")
         except Exception as e:
             logger.error(f"Error sending email: {str(e)}")
             raise 
