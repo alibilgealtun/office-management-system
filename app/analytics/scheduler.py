@@ -8,7 +8,7 @@ from .email_notifier import EmailNotifier
 
 logger = get_logger(__name__)
 
-def setup_scheduler():
+def setup_scheduler(rfid_service=None):
     """Sets up and configures the application scheduler"""
     try:
         scheduler = BackgroundScheduler()
@@ -20,29 +20,25 @@ def setup_scheduler():
         email_notifier = EmailNotifier()
         
         def generate_and_send_report():
+            """Generate and send daily report"""
             try:
                 report = report_generator.generate_daily_report()
                 email_notifier.send_report(report)
+                logger.info("Daily report generated and sent successfully")
             except Exception as e:
-                logger.error(f"Error in generate_and_send_report: {str(e)}")
+                logger.error(f"Error generating/sending daily report: {str(e)}")
         
-        # Parse the cron expression
-        try:
-            scheduler.add_job(
-                generate_and_send_report,
-                CronTrigger.from_crontab(REPORT_GENERATION_TIME),
-                id='daily_report_job'
-            )
-        except Exception as e:
-            logger.error(f"Error setting up daily report job: {str(e)}")
-            # Fallback to a default time if cron expression is invalid
-            scheduler.add_job(
-                generate_and_send_report,
-                'cron',
-                hour=21,
-                minute=0,
-                id='daily_report_job'
-            )
+        # Schedule daily report generation
+        scheduler.add_job(
+            generate_and_send_report,
+            CronTrigger.from_crontab(REPORT_GENERATION_TIME)
+        )
+        
+        # Add admin card report generation capability to RFID service
+        if rfid_service:
+            rfid_service.report_generator = report_generator
+            rfid_service.email_notifier = email_notifier
+            logger.info("Added report generation capability to RFID service")
         
         logger.info("Scheduler initialized successfully")
         return scheduler
